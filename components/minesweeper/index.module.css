@@ -1,0 +1,7 @@
+.minesweeper{
+    display: inline-flex;
+    flex-direction: column;
+    border-color: black;
+    border-width: 5px;
+
+}
