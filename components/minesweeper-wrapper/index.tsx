@@ -9,16 +9,17 @@ interface PropsInterface {
     height: number;
 }
 
-type SetTiles2DType = (React.Dispatch<React.SetStateAction<number>>|null)[][];
-
+type Callback = ((newTile: number)=>void) | null;
 interface ContextInterface
 {
     tiles: number[][]; // the view tile status (hidden, flagged, empty, 1-8, bomb)
-    setTiles: SetTiles2DType;//
-    tileClicked: ((rowIndex: number, columnIndex: number) => void) | null;
+    setTiles: Callback[][];
+    tileClicked: (rowIndex: number, columnIndex: number) => void;
 }
 
-const MinesweeperContext = createContext<ContextInterface>({tiles: [], setTiles: [], tileClicked: null});
+const dummyTileClicked = (rowIndex: number, columnIndex: number)=>{alert('Dummy triggered')};
+
+const MinesweeperContext = createContext<ContextInterface>({tiles: [], setTiles: [], tileClicked: dummyTileClicked});
 
 function getRandomInt(max: number): number {
     return Math.floor(Math.random() * max);
@@ -28,11 +29,11 @@ const tupleToString = (tuple: [number, number]): string => JSON.stringify(tuple)
 const stringToTuple = (str: string): [number, number] => JSON.parse(str);
 export const MinesweeperWrapper = (props: PropsInterface): JSX.Element => {
     const { width,height } = props;
-    let tiles: number[][] = [];
-    let setTiles: SetTiles2DType= [];
+    const tiles: number[][] = [];
+    const setTiles: Callback[][] = [];
     for (let i = 0; i < height; i++) {
         let row: number[] = [];
-        let setRow: (React.Dispatch<React.SetStateAction<number>> | null)[] = [];
+        let setRow: Callback[] = [];
         for (let j = 0; j < width; j++) {
             row.push(9);
             setRow.push(null);
@@ -41,7 +42,7 @@ export const MinesweeperWrapper = (props: PropsInterface): JSX.Element => {
         setTiles.push(setRow);
     }
     let bombs = new Set<string>();
-    let numBombs: number = getRandomInt(width * height / 4);
+    let numBombs: number = getRandomInt(width * height / 6);
     console.log(numBombs);
     for (let index = 0; index < numBombs; index++) {
         let randomRow = 0;
@@ -55,34 +56,85 @@ export const MinesweeperWrapper = (props: PropsInterface): JSX.Element => {
     }
 
     let changeTile = (rowIndex: number, columnIndex: number, newTile: number) =>{
+        tiles[rowIndex][columnIndex] = newTile;
         let setTile = setTiles[rowIndex][columnIndex];
         if (setTile){
-            setTile(newTile);
-            tiles[rowIndex][columnIndex] = newTile;
+            setTile(newTile); 
         }
-        else
-        {
-            alert("setTile not set");
+    }
+    let inBound = (rowIndex: number, columnIndex: number): boolean=>{
+        return rowIndex >= 0 && rowIndex < height && columnIndex >= 0 && columnIndex < width;
+    }
+    let isBomb = (rowIndex: number, columnIndex: number) =>{
+        if (!inBound(rowIndex, columnIndex)){
+            return 0;
         }
+        let tupleStr = tupleToString([rowIndex, columnIndex]);
+        if (bombs.has(tupleStr)){
+            return 1;
+        }
+        return 0;
+    }
+    // guaranteed to be within grid
+    let calculateNum = (rowIndex: number, columnIndex: number): number=>{
+        if (rowIndex < 0 || rowIndex >= height || columnIndex < 0 || columnIndex >= width){
+            return -1;
+        }
+        let num: number = 0;
+
+        [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]].forEach(
+            ([rowOffset, columnOffset])=>{
+                num += isBomb(rowIndex + rowOffset, columnIndex + columnOffset);
+            }
+        )
+        return num;
+    }
+
+    let exposeAllBombs = () =>{
+        bombs.forEach((str)=>{
+            let [rowIdx, columnIdx] = stringToTuple(str);
+            changeTile(rowIdx, columnIdx, 11);
+        });
+    }
+    let calculateAndExpose = (rowIndex: number, columnIndex: number)=>{
+        if (!inBound(rowIndex, columnIndex)){
+            return;
+        }
+        let tile = tiles[rowIndex][columnIndex];
+        if (exposed(tile)){
+            return;
+        }
+        if (isBomb(rowIndex, columnIndex)){
+            exposeAllBombs();
+            return;
+        }
+        let num: number = calculateNum(rowIndex, columnIndex);
+        changeTile(rowIndex, columnIndex, num);
+        if (num == 0){
+            exposeSurrounding(rowIndex, columnIndex);
+        }
+    }
+    let exposed = (tile: number): boolean =>{
+        return tile <=8 || tile == 11;
+    }
+    let exposeSurrounding = (rowIndex: number, columnIndex: number) =>{
+        [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]].forEach(
+            ([rowOffset, columnOffset])=>{
+                let newRowIndex = rowIndex + rowOffset;
+                let newColumnIndex = columnIndex + columnOffset;
+                calculateAndExpose(newRowIndex, newColumnIndex);
+            }
+        )
     }
 
     let tileClicked = (rowIndex: number, columnIndex: number) =>{
         console.log(bombs);
-        let newTile = 0;
-        let tile = tiles[rowIndex][columnIndex];
-        if (bombs.has(tupleToString([rowIndex, columnIndex])))
-        {
-            bombs.forEach((str)=>{
-                let [rowIdx, columnIdx] = stringToTuple(str);
-                changeTile(rowIdx, columnIdx, 11);
-            });
-        }
-        else
-        {
-            changeTile(rowIndex, columnIndex, 0);
-        }
+        calculateAndExpose(rowIndex, columnIndex);
     };
     
+
+
+
     return (
         <MinesweeperContext.Provider value={{tiles, setTiles, tileClicked}}>
             <Minesweeper width={width} height={height}/>

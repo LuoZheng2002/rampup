@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Image from "next/image";
 import {useState} from "react";
 import { UseMinesweeperContext } from "components/minesweeper-wrapper";
@@ -43,14 +43,21 @@ const MineGrid = (props: PropsInterface): JSX.Element => {
     const { rowIndex, columnIndex} = props;
     
     let minesweeperContext = UseMinesweeperContext();
-    let [localTile, setTile] = useState(9);
-    let tileClicked = minesweeperContext.tileClicked;
-    minesweeperContext.setTiles[rowIndex][columnIndex] = setTile;
+    const [localTile, setTile] = useState(0);
+    useEffect(()=>{
+        minesweeperContext.setTiles[rowIndex][columnIndex] = setTile;
+        let tile = minesweeperContext.tiles[rowIndex][columnIndex];
+        setTile(tile); 
+        console.log('useeffect triggered');
+        return ()=>{
+            console.log('useeffect closed'); 
+            minesweeperContext.setTiles[rowIndex][columnIndex] = null;
+        }
+    }, []); 
     let currentTileClicked = ()=>{
-        if (tileClicked)
-            tileClicked(rowIndex, columnIndex);
+        minesweeperContext.tileClicked(rowIndex, columnIndex);
     }
-    return (
+    return (  
         <div className={styles.container} onClick={currentTileClicked}>
             <Image
                 src={imageDict[localTile]}
