@@ -42,7 +42,7 @@ export const MinesweeperWrapper = (props: PropsInterface): JSX.Element => {
         setTiles.push(setRow);
     }
     let bombs = new Set<string>();
-    let numBombs: number = getRandomInt(width * height / 6);
+    let numBombs: number = Math.floor(width * height / 10);
     console.log(numBombs);
     for (let index = 0; index < numBombs; index++) {
         let randomRow = 0;
